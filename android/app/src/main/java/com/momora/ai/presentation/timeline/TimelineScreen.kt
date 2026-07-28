@@ -49,7 +49,7 @@ fun TimelineScreen() {
     ) {
         // Header
         Column(
-            modifier = Modifier.padding(horizontal = 24.dp, top = 24.dp),
+            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
