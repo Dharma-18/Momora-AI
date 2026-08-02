@@ -15,6 +15,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
@@ -33,6 +36,8 @@ import com.momora.ai.core.components.GlassCard
 import com.momora.ai.core.components.GlassPanel
 import com.momora.ai.core.theme.MomoraColors
 
+import androidx.hilt.navigation.compose.hiltViewModel
+
 /**
  * Chat Screen — "Ask Momora" AI conversation interface.
  *
@@ -44,9 +49,18 @@ import com.momora.ai.core.theme.MomoraColors
  * - Typing indicator animation
  */
 @Composable
-fun ChatScreen() {
-    val messages = remember { sampleMessages }
+fun ChatScreen(
+    viewModel: ChatViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
+
+    // Scroll to bottom when new messages arrive
+    LaunchedEffect(uiState.messages.size) {
+        if (uiState.messages.isNotEmpty()) {
+            listState.animateScrollToItem(uiState.messages.size - 1 + 2) // +2 for welcome & suggestions
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -70,14 +84,21 @@ fun ChatScreen() {
 
             // Suggested questions
             item {
-                SuggestedQuestions()
+                SuggestedQuestions(onSuggestionClick = { viewModel.sendMessage(it) })
             }
 
             // Messages
-            items(messages) { message ->
+            items(uiState.messages) { message ->
                 when (message) {
                     is ChatMessage.User -> UserMessageBubble(message)
                     is ChatMessage.AI -> AIMessageBubble(message)
+                }
+            }
+
+            // Loading indicator
+            if (uiState.isLoading) {
+                item {
+                    AIMessageLoadingBubble()
                 }
             }
         }
@@ -85,6 +106,7 @@ fun ChatScreen() {
         // Input Bar
         ChatInputBar(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            onSendClick = { viewModel.sendMessage(it) }
         )
     }
 }
@@ -157,7 +179,7 @@ private fun WelcomeSection() {
 }
 
 @Composable
-private fun SuggestedQuestions() {
+private fun SuggestedQuestions(onSuggestionClick: (String) -> Unit) {
     val suggestions = listOf(
         "📚 Any pending assignments?",
         "📅 What's my schedule today?",
@@ -170,15 +192,15 @@ private fun SuggestedQuestions() {
         contentPadding = PaddingValues(vertical = 8.dp),
     ) {
         items(suggestions) { suggestion ->
-            SuggestionChip(text = suggestion)
+            SuggestionChip(text = suggestion, onClick = { onSuggestionClick(suggestion) })
         }
     }
 }
 
 @Composable
-private fun SuggestionChip(text: String) {
+private fun SuggestionChip(text: String, onClick: () -> Unit) {
     Surface(
-        modifier = Modifier.clickable { /* TODO */ },
+        modifier = Modifier.clickable { onClick() },
         shape = RoundedCornerShape(50),
         color = MomoraColors.SurfaceVariant,
         border = androidx.compose.foundation.BorderStroke(1.dp, MomoraColors.GlassBorder),
@@ -279,6 +301,35 @@ private fun AIMessageBubble(message: ChatMessage.AI) {
 }
 
 @Composable
+private fun AIMessageLoadingBubble() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(vertical = 8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(MomoraColors.SurfaceContainerHigh),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.AutoAwesome,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(14.dp),
+            )
+        }
+        Text(
+            text = "Thinking...",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
 private fun SourceCitationCard(source: SourceCitation) {
     val sourceColor = when (source.type) {
         "WhatsApp" -> MomoraColors.Tertiary
@@ -352,7 +403,10 @@ private fun SourceCitationCard(source: SourceCitation) {
 }
 
 @Composable
-private fun ChatInputBar(modifier: Modifier = Modifier) {
+private fun ChatInputBar(
+    modifier: Modifier = Modifier,
+    onSendClick: (String) -> Unit
+) {
     var inputText by remember { mutableStateOf("") }
 
     GlassCard(
@@ -383,6 +437,15 @@ private fun ChatInputBar(modifier: Modifier = Modifier) {
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
                     color = MaterialTheme.colorScheme.onSurface,
                 ),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(
+                    onSend = {
+                        if (inputText.isNotBlank()) {
+                            onSendClick(inputText)
+                            inputText = ""
+                        }
+                    }
+                ),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 decorationBox = { innerTextField ->
                     Box {
@@ -409,7 +472,12 @@ private fun ChatInputBar(modifier: Modifier = Modifier) {
 
             // Send button
             IconButton(
-                onClick = { /* TODO: Send message */ inputText = "" },
+                onClick = { 
+                    if (inputText.isNotBlank()) {
+                        onSendClick(inputText)
+                        inputText = ""
+                    }
+                },
                 enabled = inputText.isNotBlank(),
             ) {
                 Box(
@@ -453,29 +521,4 @@ data class SourceCitation(
 
 // --- Sample Data ---
 
-private val sampleMessages = listOf(
-    ChatMessage.User("Did my professor postpone the assignment deadline?"),
-    ChatMessage.AI(
-        text = "Yes! Based on your data, the assignment deadline has been updated.\n\n" +
-                "• Original deadline: Aug 10 (from email)\n" +
-                "• Extended to: Aug 12 (WhatsApp group)\n" +
-                "• Final submission: Aug 13 (Faculty announcement)\n\n" +
-                "The most recent and authoritative source is the Faculty announcement on Aug 11.",
-        sources = listOf(
-            SourceCitation("Faculty", "Aug 11 announcement", 98),
-            SourceCitation("WhatsApp", "CS-301 Group Chat", 85),
-            SourceCitation("Email", "dept.circular@univ.edu", 72),
-        ),
-    ),
-    ChatMessage.User("What did Rahul mention about the Goa trip?"),
-    ChatMessage.AI(
-        text = "Rahul mentioned the Goa trip in 3 conversations:\n\n" +
-                "1. June 14: \"Let's plan for Goa in December\"\n" +
-                "2. July 2: \"I found cheap flights for Dec 20-25\"\n" +
-                "3. July 18: \"Booking the Airbnb tomorrow, need ₹3000 from everyone\"\n\n" +
-                "It looks like you may need to send ₹3000 to Rahul for the accommodation booking.",
-        sources = listOf(
-            SourceCitation("WhatsApp", "Chat with Rahul", 95),
-        ),
-    ),
-)
+// Removing hardcoded sampleMessages since we are now using real ViewModel state.

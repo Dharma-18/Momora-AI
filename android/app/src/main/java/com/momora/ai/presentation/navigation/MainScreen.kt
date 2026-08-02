@@ -122,6 +122,8 @@ fun MainScreen() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
+                .imePadding()
         ) {
             composable(Screen.Home.route) {
                 HomeScreen(
