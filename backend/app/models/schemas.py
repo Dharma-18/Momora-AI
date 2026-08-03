@@ -60,3 +60,17 @@ class SearchResultItem(BaseModel):
 class SearchResponse(BaseModel):
     query: str
     results: List[SearchResultItem]
+
+# --- Text Ingestion Schemas ---
+
+class TextIngestRequest(BaseModel):
+    user_id: str = "default_user"
+    text: str
+    source_name: str
+    source_type: str = "TextFile"
+
+class TextIngestResponse(BaseModel):
+    document_id: str
+    source_name: str
+    num_chunks: int
+    message: str

@@ -35,6 +35,7 @@ import com.momora.ai.core.theme.MomoraColors
 fun GlassCard(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 12.dp,
+    backgroundColor: Color = MomoraColors.CardBackground,
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -51,7 +52,7 @@ fun GlassCard(
         modifier = modifier
             .scale(scale)
             .clip(shape)
-            .background(MomoraColors.CardBackground)
+            .background(backgroundColor)
             .border(1.dp, MomoraColors.GlassBorder, shape)
             .then(
                 if (onClick != null) {

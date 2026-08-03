@@ -78,6 +78,50 @@ class DocumentService:
             "raw_text_length": len(raw_text)
         }
 
+    def process_raw_text(
+        self,
+        text: str,
+        source_name: str,
+        source_type: str = "TextFile",
+        user_id: str = "default_user",
+        category: str = "General"
+    ) -> Dict[str, Any]:
+        """Ingest raw text content directly without a file upload."""
+        document_id = str(uuid.uuid4())
+
+        if not text.strip():
+            raise ValueError("Text content is empty.")
+
+        chunks = self.text_splitter.split_text(text)
+
+        metadatas = []
+        ids = []
+        for index, chunk in enumerate(chunks):
+            chunk_id = f"{document_id}_{index}"
+            ids.append(chunk_id)
+            metadatas.append({
+                "document_id": document_id,
+                "filename": source_name,
+                "source_type": source_type,
+                "user_id": user_id,
+                "category": category,
+                "chunk_index": index,
+                "total_chunks": len(chunks)
+            })
+
+        self.vector_store.add_documents(
+            user_id=user_id,
+            documents=chunks,
+            metadatas=metadatas,
+            ids=ids
+        )
+
+        return {
+            "document_id": document_id,
+            "source_name": source_name,
+            "num_chunks": len(chunks),
+        }
+
 _document_service_instance = None
 
 def get_document_service() -> DocumentService:
